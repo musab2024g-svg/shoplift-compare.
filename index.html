@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THE GHOST HUNTER | NEXUS O2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #050505;
+            color: #00f2ff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+        }
+        /* تأثير الثقب الدودي */
+        #wormhole-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: -1;
+        }
+        .glass-panel {
+            background: rgba(0, 242, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 242, 255, 0.2);
+            border-radius: 15px;
+        }
+        .scanning-line {
+            height: 2px;
+            background: #00f2ff;
+            box-shadow: 0 0 15px #00f2ff;
+            position: absolute;
+            width: 100%;
+            animation: scan 3s linear infinite;
+        }
+        @keyframes scan {
+            0% { top: 0; }
+            100% { top: 100%; }
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center h-screen">
+
+    <canvas id="wormhole-canvas"></canvas>
+
+    <div class="glass-panel p-8 text-center max-w-lg relative overflow-hidden">
+        <div class="scanning-line"></div>
+        <h1 class="text-3xl font-bold mb-4 tracking-widest uppercase">THE GHOST HUNTER</h1>
+        <p class="text-sm opacity-70 mb-6 italic">"Accessing the Unreachable"</p>
+        
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="p-4 border border-cyan-900 rounded">
+                <span class="block text-xs uppercase opacity-50">Assets Scanned</span>
+                <span class="text-xl font-bold" id="assets-count">1,248</span>
+            </div>
+            <div class="p-4 border border-cyan-900 rounded">
+                <span class="block text-xs uppercase opacity-50">Ghost Domains Found</span>
+                <span class="text-xl font-bold text-yellow-400" id="ghost-count">12</span>
+            </div>
+        </div>
+
+        <button class="bg-cyan-600 hover:bg-cyan-500 text-black font-bold py-3 px-8 rounded-full transition-all duration-300 shadow-[0_0_20px_#00f2ff]">
+            ENTER THE NEXUS
+        </button>
+    </div>
+
+    <script>
+        // كود بسيط لتحريك الثقب الدودي في الخلفية
+        const canvas = document.getElementById('wormhole-canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let stars = [];
+        for(let i=0; i<200; i++) {
+            stars.push({
+                x: Math.random() * canvas.width - canvas.width/2,
+                y: Math.random() * canvas.height - canvas.height/2,
+                z: Math.random() * canvas.width
+            });
+        }
+
+        function draw() {
+            ctx.fillStyle = 'black';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.translate(canvas.width/2, canvas.height/2);
+            
+            stars.forEach(s => {
+                s.z -= 5;
+                if(s.z <= 0) s.z = canvas.width;
+                let sx = (s.x / s.z) * canvas.width;
+                let sy = (s.y / s.z) * canvas.width;
+                let size = (1 - s.z / canvas.width) * 5;
+                ctx.fillStyle = '#00f2ff';
+                ctx.beginPath();
+                ctx.arc(sx, sy, size, 0, Math.PI*2);
+                ctx.fill();
+            });
+
+            ctx.translate(-canvas.width/2, -canvas.height/2);
+            requestAnimationFrame(draw);
+        }
+        draw();
+    </script>
+</body>
+</html>
