@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, render_template_string
 import requests
+import os
 
 app = Flask(__name__)
 
@@ -67,19 +68,19 @@ def analyze():
     data = request.json
     a = get_products(data['store_a'])
     b = get_products(data['store_b'])
-    
+
     if not a and not b:
         return jsonify({"report": "❌ Could not fetch products from both stores."})
-    
+
     common = set(a.keys()) & set(b.keys())
     only_a = set(a.keys()) - set(b.keys())
     only_b = set(b.keys()) - set(a.keys())
-    
+
     report = f"📊 COMPARISON REPORT\n{'='*40}\n"
     report += f"Store A: {len(a)} products\n"
     report += f"Store B: {len(b)} products\n"
     report += f"Common products: {len(common)}\n\n"
-    
+
     report += "💰 PRICE COMPARISON (common products):\n"
     for p in list(common)[:20]:
         diff = a[p] - b[p]
@@ -89,11 +90,12 @@ def analyze():
             report += f"  {p}: A=${a[p]} | B=${b[p]} → A is cheaper by ${abs(diff):.2f}\n"
         else:
             report += f"  {p}: ${a[p]} (same price)\n"
-    
-    report += f"\n🅰️ Only in Store A ({len(only_a)} products)\n"
-    report += f"🅱️ Only in Store B ({len(only_b)} products)\n"
-    
+
+    report += f"\n🅰️ Only in Store A: {len(only_a)} products\n"
+    report += f"🅱️ Only in Store B: {len(only_b)} products\n"
+
     return jsonify({"report": report})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
