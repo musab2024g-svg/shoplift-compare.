@@ -4,7 +4,7 @@ import os
 import json
 
 app = Flask(__name__)
-GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '8598239603:AAEgq0lKEv3y2yPFFok2ClJPrs-YsVAn_cG4')
+GEMINI_KEY = os.environ.get('GEMINI_API_KEY', '')
 
 HTML = '''<!DOCTYPE html>
 <html lang="en">
@@ -29,7 +29,6 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
 .analyze-box input:focus{border-color:#a855f7}
 .analyze-btn{width:100%;background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;border:none;padding:16px;border-radius:10px;font-size:16px;font-weight:700;cursor:pointer;transition:opacity 0.2s}
 .analyze-btn:hover{opacity:0.9}
-.analyze-btn:disabled{opacity:0.5;cursor:not-allowed}
 .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;padding:60px 40px;max-width:1200px;margin:0 auto}
 .feature-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:24px;transition:border-color 0.3s}
 .feature-card:hover{border-color:rgba(168,85,247,0.4)}
@@ -84,13 +83,10 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
 .chart-card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:20px}
 .chart-card h4{font-size:15px;font-weight:700;margin-bottom:16px}
 .ai-section{background:linear-gradient(135deg,rgba(168,85,247,0.1),rgba(6,182,212,0.1));border:1px solid rgba(168,85,247,0.2);border-radius:20px;padding:30px;margin-bottom:30px}
-.ai-section h3{font-size:18px;font-weight:700;margin-bottom:20px;display:flex;align-items:center;gap:8px}
+.ai-section h3{font-size:18px;font-weight:700;margin-bottom:20px}
 .ai-rec{background:rgba(255,255,255,0.05);border-radius:12px;padding:16px;margin-bottom:12px}
 .ai-rec-title{font-size:14px;font-weight:600;margin-bottom:6px;color:#a855f7}
 .ai-rec-text{font-size:13px;color:#94a3b8;line-height:1.6}
-.funnel{display:flex;flex-direction:column;gap:8px}
-.funnel-step{background:rgba(168,85,247,0.1);border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center}
-.funnel-bar{height:6px;background:linear-gradient(90deg,#a855f7,#06b6d4);border-radius:3px;margin-top:6px}
 @media(max-width:768px){.score-section{grid-template-columns:1fr;text-align:center}.nav{padding:15px 20px}.features{padding:40px 20px}}
 </style>
 </head>
@@ -171,13 +167,22 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
 <script>
 let funnelChart, perfChart;
 
+function checkAutoStart() {
+  const params = new URLSearchParams(window.location.search);
+  const storeUrl = params.get('store_url');
+  if (storeUrl) {
+    document.getElementById('analyzeInput').value = storeUrl;
+    startAnalysis();
+  }
+}
+
+window.onload = checkAutoStart;
+
 async function startAnalysis() {
   const url = document.getElementById('analyzeInput').value.trim();
   if (!url) { alert('Please enter your store URL'); return; }
-  
   document.getElementById('landingPage').style.display = 'none';
   document.getElementById('loadingSection').style.display = 'block';
-  
   const steps = ['step1','step2','step3','step4','step5'];
   let i = 0;
   const stepInterval = setInterval(() => {
@@ -185,7 +190,6 @@ async function startAnalysis() {
     if (i < steps.length) { document.getElementById(steps[i]).className = 'step active'; i++; }
     else { clearInterval(stepInterval); }
   }, 2000);
-  
   try {
     const res = await fetch('/analyze', {
       method: 'POST',
@@ -205,34 +209,27 @@ async function startAnalysis() {
 function showDashboard(data, url) {
   document.getElementById('loadingSection').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
-  
   const score = data.score;
   document.getElementById('scoreNumber').textContent = score;
   document.getElementById('dashTitle').textContent = 'Revenue Intelligence Report — ' + url.replace('https://','').replace('http://','');
-  
   const circle = document.getElementById('scoreCircle');
   if (score >= 70) { circle.className = 'score-circle score-good'; document.getElementById('scoreTitle').textContent = 'Your Store Is Performing Well'; }
   else if (score >= 40) { circle.className = 'score-circle score-medium'; document.getElementById('scoreTitle').textContent = 'Significant Revenue Leaks Detected'; }
   else { circle.className = 'score-circle score-bad'; document.getElementById('scoreTitle').textContent = 'Critical Issues Are Costing You Sales'; }
-  
   document.getElementById('scoreDesc').textContent = data.score_desc;
   document.getElementById('revenueLoss').textContent = '$' + data.revenue_loss.toLocaleString();
-  
   const metrics = [
     {value: data.products + ' Products', label: 'Total Catalog Size', change: data.products < 10 ? '⚠️ Small catalog' : '✅ Good size', bad: data.products < 10},
     {value: data.missing_images + ' Missing', label: 'Products Without Images', change: data.missing_images > 0 ? '🔴 Hurting conversions' : '✅ All good', bad: data.missing_images > 0},
     {value: data.missing_desc + ' Missing', label: 'Missing Descriptions', change: data.missing_desc > 0 ? '🔴 Hurting SEO' : '✅ All good', bad: data.missing_desc > 0},
     {value: data.perf_score + '/100', label: 'Performance Score', change: data.perf_score < 50 ? '🔴 Critical' : data.perf_score < 80 ? '⚠️ Needs work' : '✅ Fast', bad: data.perf_score < 50},
   ];
-  
   document.getElementById('metricsGrid').innerHTML = metrics.map(m => `
     <div class="metric-card">
       <div class="metric-value">${m.value}</div>
       <div class="metric-label">${m.label}</div>
       <div class="metric-change ${m.bad ? 'bad' : 'good'}">${m.change}</div>
-    </div>
-  `).join('');
-  
+    </div>`).join('');
   document.getElementById('issuesList').innerHTML = data.issues.map(issue => `
     <div class="issue-card">
       <div class="issue-left">
@@ -246,41 +243,27 @@ function showDashboard(data, url) {
         <div class="impact-value">-$${issue.impact}/mo</div>
         <div class="impact-label">Revenue Impact</div>
       </div>
-    </div>
-  `).join('');
-  
+    </div>`).join('');
   document.getElementById('aiRecs').innerHTML = data.recommendations.map(r => `
     <div class="ai-rec">
       <div class="ai-rec-title">${r.title}</div>
       <div class="ai-rec-text">${r.text}</div>
-    </div>
-  `).join('');
-  
+    </div>`).join('');
   if (funnelChart) funnelChart.destroy();
   if (perfChart) perfChart.destroy();
-  
   funnelChart = new Chart(document.getElementById('funnelChart'), {
     type: 'bar',
     data: {
       labels: ['Homepage', 'Product', 'Cart', 'Checkout', 'Payment'],
-      datasets: [{
-        data: data.funnel,
-        backgroundColor: ['rgba(168,85,247,0.8)','rgba(139,92,246,0.7)','rgba(109,40,217,0.6)','rgba(91,33,182,0.5)','rgba(76,29,149,0.4)'],
-        borderRadius: 6
-      }]
+      datasets: [{data: data.funnel, backgroundColor: ['rgba(168,85,247,0.8)','rgba(139,92,246,0.7)','rgba(109,40,217,0.6)','rgba(91,33,182,0.5)','rgba(76,29,149,0.4)'], borderRadius: 6}]
     },
     options: {plugins:{legend:{display:false}},scales:{y:{ticks:{color:'#64748b',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#64748b'},grid:{display:false}}}}
   });
-  
   perfChart = new Chart(document.getElementById('perfChart'), {
     type: 'doughnut',
     data: {
       labels: ['Performance', 'SEO', 'UX', 'Mobile'],
-      datasets: [{
-        data: [data.perf_score, data.seo_score, data.ux_score, data.mobile_score],
-        backgroundColor: ['rgba(168,85,247,0.8)','rgba(6,182,212,0.8)','rgba(16,185,129,0.8)','rgba(245,158,11,0.8)'],
-        borderWidth: 0
-      }]
+      datasets: [{data: [data.perf_score, data.seo_score, data.ux_score, data.mobile_score], backgroundColor: ['rgba(168,85,247,0.8)','rgba(6,182,212,0.8)','rgba(16,185,129,0.8)','rgba(245,158,11,0.8)'], borderWidth: 0}]
     },
     options: {plugins:{legend:{labels:{color:'#94a3b8'}}},cutout:'70%'}
   });
@@ -292,17 +275,13 @@ function showDashboard(data, url) {
 def get_gemini_recommendations(store_data):
     try:
         prompt = f"""You are a top ecommerce conversion expert. Analyze this store data and give 3 specific revenue-boosting recommendations:
-
 Store has {store_data['products']} products
-{store_data['missing_images']} products missing images  
+{store_data['missing_images']} products missing images
 {store_data['missing_desc']} products missing descriptions
 Performance score: {store_data['perf_score']}/100
-
 Return JSON array with exactly 3 objects, each having "title" and "text" fields.
 Be specific, business-focused, and mention potential revenue impact.
-Example: [{{"title": "Fix Missing Product Images", "text": "Your 5 products without images are likely losing..."}}]
 Return ONLY the JSON array, no other text."""
-
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
         res = requests.post(url, json={"contents": [{"parts": [{"text": prompt}]}]}, timeout=15)
         text = res.json()['candidates'][0]['content']['parts'][0]['text']
@@ -350,29 +329,23 @@ def analyze():
     store_url = data.get('store_url', '').strip()
     if not store_url.startswith('http'):
         store_url = 'https://' + store_url
-
     products = get_products(store_url)
     speed = get_pagespeed(store_url)
-
     perf = speed['performance']
     seo = speed['seo']
     acc = speed['accessibility']
     ux_score = min(100, acc + 10)
     mobile_score = perf
-
     issues = []
     revenue_loss = 0
-
     if products['missing_images'] > 0:
         impact = products['missing_images'] * 180
         revenue_loss += impact
         issues.append({'title': f"{products['missing_images']} Products Missing Images", 'desc': 'Products without images have 60% lower conversion rates', 'priority': 'critical', 'impact': impact})
-
     if products['missing_desc'] > 0:
         impact = products['missing_desc'] * 120
         revenue_loss += impact
         issues.append({'title': f"{products['missing_desc']} Products Missing Descriptions", 'desc': 'Missing descriptions hurt SEO and buyer confidence', 'priority': 'high', 'impact': impact})
-
     if perf < 50:
         impact = 800
         revenue_loss += impact
@@ -381,44 +354,29 @@ def analyze():
         impact = 400
         revenue_loss += impact
         issues.append({'title': 'Slow Page Load Speed', 'desc': f'Performance score {perf}/100 — every extra second costs 7% in conversions', 'priority': 'high', 'impact': impact})
-
     if seo < 60:
         impact = 500
         revenue_loss += impact
         issues.append({'title': 'Poor SEO — Losing Organic Traffic', 'desc': f'SEO score {seo}/100 — your store is invisible to most Google searches', 'priority': 'high', 'impact': impact})
-
     if products['total'] < 10:
-        issues.append({'title': 'Small Product Catalog', 'desc': 'Limited product selection reduces average order value and repeat purchases', 'priority': 'medium', 'impact': 200})
+        issues.append({'title': 'Small Product Catalog', 'desc': 'Limited product selection reduces average order value', 'priority': 'medium', 'impact': 200})
         revenue_loss += 200
-
     score = max(10, min(95, int((perf * 0.3) + (seo * 0.2) + (ux_score * 0.2) + (max(0, 100 - (products['missing_images'] * 10)) * 0.3))))
-
     if score >= 70:
         score_desc = "Your store is performing well but there are still opportunities to increase revenue and conversions."
     elif score >= 40:
         score_desc = "We detected significant revenue leaks. Fixing these issues could increase your monthly revenue substantially."
     else:
         score_desc = "Critical issues are costing you significant revenue daily. Immediate action is required."
-
     store_data = {'products': products['total'], 'missing_images': products['missing_images'], 'missing_desc': products['missing_desc'], 'perf_score': perf}
     recommendations = get_gemini_recommendations(store_data)
-
     funnel = [100, 68, 42, 28, 18]
-
     return jsonify({
-        'score': score,
-        'score_desc': score_desc,
-        'revenue_loss': revenue_loss,
-        'products': products['total'],
-        'missing_images': products['missing_images'],
-        'missing_desc': products['missing_desc'],
-        'perf_score': perf,
-        'seo_score': seo,
-        'ux_score': ux_score,
-        'mobile_score': mobile_score,
-        'issues': issues,
-        'recommendations': recommendations,
-        'funnel': funnel
+        'score': score, 'score_desc': score_desc, 'revenue_loss': revenue_loss,
+        'products': products['total'], 'missing_images': products['missing_images'],
+        'missing_desc': products['missing_desc'], 'perf_score': perf,
+        'seo_score': seo, 'ux_score': ux_score, 'mobile_score': mobile_score,
+        'issues': issues, 'recommendations': recommendations, 'funnel': funnel
     })
 
 if __name__ == '__main__':
