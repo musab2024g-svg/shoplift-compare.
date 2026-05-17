@@ -43,6 +43,11 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
 .step-dot{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
 .spinner{width:60px;height:60px;border:3px solid rgba(168,85,247,0.1);border-top-color:#a855f7;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto}
 @keyframes spin{to{transform:rotate(360deg)}}
+.error-box{display:none;text-align:center;padding:60px 20px}
+.error-card{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:16px;padding:30px;max-width:500px;margin:0 auto}
+.error-card h3{font-size:20px;font-weight:700;color:#ef4444;margin-bottom:12px}
+.error-card p{color:#94a3b8;margin-bottom:20px}
+.error-card button{background:linear-gradient(135deg,#a855f7,#06b6d4);color:#fff;border:none;padding:12px 24px;border-radius:8px;cursor:pointer;font-weight:600}
 .dashboard{display:none;max-width:1200px;margin:0 auto;padding:40px 20px}
 .dash-header{margin-bottom:40px}
 .dash-header h2{font-size:28px;font-weight:800;margin-bottom:8px}
@@ -93,7 +98,7 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
 <body>
 <nav class="nav">
   <div class="logo">ConvertIQ</div>
-  <button class="nav-btn" onclick="document.getElementById('analyzeInput').focus()">Analyze Store →</button>
+  <button class="nav-btn" onclick="showLanding()">Analyze Store →</button>
 </nav>
 
 <div id="landingPage">
@@ -102,9 +107,9 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
     <h1>Stop Losing Revenue<br><span>You Don't Know About</span></h1>
     <p>Uncover hidden conversion killers, detect revenue leaks, and get AI-powered recommendations to maximize your ecommerce performance.</p>
     <div class="analyze-box">
-      <input id="analyzeInput" type="url" placeholder="Enter your Shopify store URL..." />
+      <input id="analyzeInput" type="url" placeholder="Enter your Shopify store URL (e.g. https://yourstore.myshopify.com)" />
       <button class="analyze-btn" onclick="startAnalysis()">🚀 Analyze My Store — It's Free</button>
-      <p style="font-size:12px;color:#475569;margin-top:12px">No credit card required • Results in 60 seconds</p>
+      <p style="font-size:12px;color:#475569;margin-top:12px">No credit card required • Results in 60 seconds • Only works with Shopify stores</p>
     </div>
   </div>
   <div class="features">
@@ -127,6 +132,14 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
     <div class="step" id="step3"><div class="step-dot"></div>Detecting revenue leaks...</div>
     <div class="step" id="step4"><div class="step-dot"></div>Running AI analysis...</div>
     <div class="step" id="step5"><div class="step-dot"></div>Generating your report...</div>
+  </div>
+</div>
+
+<div class="error-box" id="errorSection">
+  <div class="error-card">
+    <h3>❌ Store Not Found</h3>
+    <p id="errorMessage">We couldn't find this store. Please make sure it's a valid Shopify store URL.</p>
+    <button onclick="showLanding()">Try Another Store</button>
   </div>
 </div>
 
@@ -162,10 +175,21 @@ body{background:#0a0a0f;color:#fff;font-family:'Inter',sans-serif;min-height:100
     <h3>🤖 AI Revenue Recommendations</h3>
     <div id="aiRecs"></div>
   </div>
+  <div style="text-align:center;padding:20px">
+    <button onclick="showLanding()" style="background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.1);color:#fff;padding:12px 24px;border-radius:8px;cursor:pointer">← Analyze Another Store</button>
+  </div>
 </div>
 
 <script>
 let funnelChart, perfChart;
+
+function showLanding() {
+  document.getElementById('landingPage').style.display = 'block';
+  document.getElementById('loadingSection').style.display = 'none';
+  document.getElementById('errorSection').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
+  document.getElementById('analyzeInput').value = '';
+}
 
 function checkAutoStart() {
   const params = new URLSearchParams(window.location.search);
@@ -181,15 +205,23 @@ window.onload = checkAutoStart;
 async function startAnalysis() {
   const url = document.getElementById('analyzeInput').value.trim();
   if (!url) { alert('Please enter your store URL'); return; }
+
   document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('errorSection').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'none';
   document.getElementById('loadingSection').style.display = 'block';
+
   const steps = ['step1','step2','step3','step4','step5'];
   let i = 0;
+  steps.forEach(s => document.getElementById(s).className = 'step');
+  document.getElementById(steps[0]).className = 'step active';
+
   const stepInterval = setInterval(() => {
-    if (i > 0) { document.getElementById(steps[i-1]).className = 'step done'; }
+    if (i > 0 && i <= steps.length) document.getElementById(steps[i-1]).className = 'step done';
     if (i < steps.length) { document.getElementById(steps[i]).className = 'step active'; i++; }
-    else { clearInterval(stepInterval); }
-  }, 2000);
+    else clearInterval(stepInterval);
+  }, 2500);
+
   try {
     const res = await fetch('/analyze', {
       method: 'POST',
@@ -198,59 +230,81 @@ async function startAnalysis() {
     });
     const data = await res.json();
     clearInterval(stepInterval);
+
+    if (data.error) {
+      document.getElementById('loadingSection').style.display = 'none';
+      document.getElementById('errorSection').style.display = 'block';
+      document.getElementById('errorMessage').textContent = data.error;
+      return;
+    }
+
     showDashboard(data, url);
   } catch(e) {
-    alert('Analysis failed. Please check the URL and try again.');
-    document.getElementById('landingPage').style.display = 'block';
+    clearInterval(stepInterval);
     document.getElementById('loadingSection').style.display = 'none';
+    document.getElementById('errorSection').style.display = 'block';
+    document.getElementById('errorMessage').textContent = 'Connection error. Please try again.';
   }
 }
 
 function showDashboard(data, url) {
   document.getElementById('loadingSection').style.display = 'none';
   document.getElementById('dashboard').style.display = 'block';
+
   const score = data.score;
   document.getElementById('scoreNumber').textContent = score;
   document.getElementById('dashTitle').textContent = 'Revenue Intelligence Report — ' + url.replace('https://','').replace('http://','');
+
   const circle = document.getElementById('scoreCircle');
   if (score >= 70) { circle.className = 'score-circle score-good'; document.getElementById('scoreTitle').textContent = 'Your Store Is Performing Well'; }
   else if (score >= 40) { circle.className = 'score-circle score-medium'; document.getElementById('scoreTitle').textContent = 'Significant Revenue Leaks Detected'; }
   else { circle.className = 'score-circle score-bad'; document.getElementById('scoreTitle').textContent = 'Critical Issues Are Costing You Sales'; }
+
   document.getElementById('scoreDesc').textContent = data.score_desc;
   document.getElementById('revenueLoss').textContent = '$' + data.revenue_loss.toLocaleString();
+
   const metrics = [
     {value: data.products + ' Products', label: 'Total Catalog Size', change: data.products < 10 ? '⚠️ Small catalog' : '✅ Good size', bad: data.products < 10},
     {value: data.missing_images + ' Missing', label: 'Products Without Images', change: data.missing_images > 0 ? '🔴 Hurting conversions' : '✅ All good', bad: data.missing_images > 0},
     {value: data.missing_desc + ' Missing', label: 'Missing Descriptions', change: data.missing_desc > 0 ? '🔴 Hurting SEO' : '✅ All good', bad: data.missing_desc > 0},
     {value: data.perf_score + '/100', label: 'Performance Score', change: data.perf_score < 50 ? '🔴 Critical' : data.perf_score < 80 ? '⚠️ Needs work' : '✅ Fast', bad: data.perf_score < 50},
   ];
+
   document.getElementById('metricsGrid').innerHTML = metrics.map(m => `
     <div class="metric-card">
       <div class="metric-value">${m.value}</div>
       <div class="metric-label">${m.label}</div>
       <div class="metric-change ${m.bad ? 'bad' : 'good'}">${m.change}</div>
     </div>`).join('');
-  document.getElementById('issuesList').innerHTML = data.issues.map(issue => `
-    <div class="issue-card">
-      <div class="issue-left">
-        <div class="issue-priority priority-${issue.priority}"></div>
-        <div>
-          <div class="issue-title">${issue.title}</div>
-          <div class="issue-desc">${issue.desc}</div>
+
+  if (data.issues.length === 0) {
+    document.getElementById('issuesList').innerHTML = '<div style="color:#10b981;padding:20px;text-align:center">✅ No critical issues found! Your store is well optimized.</div>';
+  } else {
+    document.getElementById('issuesList').innerHTML = data.issues.map(issue => `
+      <div class="issue-card">
+        <div class="issue-left">
+          <div class="issue-priority priority-${issue.priority}"></div>
+          <div>
+            <div class="issue-title">${issue.title}</div>
+            <div class="issue-desc">${issue.desc}</div>
+          </div>
         </div>
-      </div>
-      <div class="issue-impact">
-        <div class="impact-value">-$${issue.impact}/mo</div>
-        <div class="impact-label">Revenue Impact</div>
-      </div>
-    </div>`).join('');
+        <div class="issue-impact">
+          <div class="impact-value">-$${issue.impact}/mo</div>
+          <div class="impact-label">Revenue Impact</div>
+        </div>
+      </div>`).join('');
+  }
+
   document.getElementById('aiRecs').innerHTML = data.recommendations.map(r => `
     <div class="ai-rec">
       <div class="ai-rec-title">${r.title}</div>
       <div class="ai-rec-text">${r.text}</div>
     </div>`).join('');
+
   if (funnelChart) funnelChart.destroy();
   if (perfChart) perfChart.destroy();
+
   funnelChart = new Chart(document.getElementById('funnelChart'), {
     type: 'bar',
     data: {
@@ -259,6 +313,7 @@ function showDashboard(data, url) {
     },
     options: {plugins:{legend:{display:false}},scales:{y:{ticks:{color:'#64748b',callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.05)'}},x:{ticks:{color:'#64748b'},grid:{display:false}}}}
   });
+
   perfChart = new Chart(document.getElementById('perfChart'), {
     type: 'doughnut',
     data: {
@@ -274,11 +329,12 @@ function showDashboard(data, url) {
 
 def get_gemini_recommendations(store_data):
     try:
-        prompt = f"""You are a top ecommerce conversion expert. Analyze this store data and give 3 specific revenue-boosting recommendations:
+        prompt = f"""You are a top ecommerce conversion expert. Analyze this Shopify store data and give 3 specific revenue-boosting recommendations:
 Store has {store_data['products']} products
 {store_data['missing_images']} products missing images
 {store_data['missing_desc']} products missing descriptions
 Performance score: {store_data['perf_score']}/100
+SEO score: {store_data['seo_score']}/100
 Return JSON array with exactly 3 objects, each having "title" and "text" fields.
 Be specific, business-focused, and mention potential revenue impact.
 Return ONLY the JSON array, no other text."""
@@ -297,7 +353,7 @@ Return ONLY the JSON array, no other text."""
 def get_pagespeed(url):
     try:
         api_url = f"https://www.googleapis.com/pagespeedonline/v5/runPagespeed?url={url}&strategy=mobile"
-        r = requests.get(api_url, timeout=20)
+        r = requests.get(api_url, timeout=25)
         data = r.json()
         cats = data.get('lighthouseResult', {}).get('categories', {})
         return {
@@ -312,12 +368,17 @@ def get_products(store_url):
     try:
         url = f"{store_url.rstrip('/')}/products.json?limit=250"
         r = requests.get(url, timeout=15, headers={"User-Agent": "Mozilla/5.0"})
-        products = r.json().get('products', [])
+        if r.status_code != 200:
+            return None
+        data = r.json()
+        if 'products' not in data:
+            return None
+        products = data['products']
         missing_img = sum(1 for p in products if not p.get('images'))
         missing_desc = sum(1 for p in products if len(p.get('body_html', '')) < 50)
         return {'total': len(products), 'missing_images': missing_img, 'missing_desc': missing_desc}
     except:
-        return {'total': 0, 'missing_images': 0, 'missing_desc': 0}
+        return None
 
 @app.route('/')
 def home():
@@ -329,23 +390,32 @@ def analyze():
     store_url = data.get('store_url', '').strip()
     if not store_url.startswith('http'):
         store_url = 'https://' + store_url
+
     products = get_products(store_url)
+
+    if products is None:
+        return jsonify({'error': f'Could not find a valid Shopify store at "{store_url}". Please check the URL and make sure it is a Shopify store.'})
+
     speed = get_pagespeed(store_url)
     perf = speed['performance']
     seo = speed['seo']
     acc = speed['accessibility']
     ux_score = min(100, acc + 10)
     mobile_score = perf
+
     issues = []
     revenue_loss = 0
+
     if products['missing_images'] > 0:
         impact = products['missing_images'] * 180
         revenue_loss += impact
         issues.append({'title': f"{products['missing_images']} Products Missing Images", 'desc': 'Products without images have 60% lower conversion rates', 'priority': 'critical', 'impact': impact})
+
     if products['missing_desc'] > 0:
         impact = products['missing_desc'] * 120
         revenue_loss += impact
         issues.append({'title': f"{products['missing_desc']} Products Missing Descriptions", 'desc': 'Missing descriptions hurt SEO and buyer confidence', 'priority': 'high', 'impact': impact})
+
     if perf < 50:
         impact = 800
         revenue_loss += impact
@@ -354,23 +424,30 @@ def analyze():
         impact = 400
         revenue_loss += impact
         issues.append({'title': 'Slow Page Load Speed', 'desc': f'Performance score {perf}/100 — every extra second costs 7% in conversions', 'priority': 'high', 'impact': impact})
+
     if seo < 60:
         impact = 500
         revenue_loss += impact
         issues.append({'title': 'Poor SEO — Losing Organic Traffic', 'desc': f'SEO score {seo}/100 — your store is invisible to most Google searches', 'priority': 'high', 'impact': impact})
+
     if products['total'] < 10:
         issues.append({'title': 'Small Product Catalog', 'desc': 'Limited product selection reduces average order value', 'priority': 'medium', 'impact': 200})
         revenue_loss += 200
+
     score = max(10, min(95, int((perf * 0.3) + (seo * 0.2) + (ux_score * 0.2) + (max(0, 100 - (products['missing_images'] * 10)) * 0.3))))
+
     if score >= 70:
         score_desc = "Your store is performing well but there are still opportunities to increase revenue and conversions."
     elif score >= 40:
         score_desc = "We detected significant revenue leaks. Fixing these issues could increase your monthly revenue substantially."
     else:
         score_desc = "Critical issues are costing you significant revenue daily. Immediate action is required."
-    store_data = {'products': products['total'], 'missing_images': products['missing_images'], 'missing_desc': products['missing_desc'], 'perf_score': perf}
+
+    store_data = {'products': products['total'], 'missing_images': products['missing_images'], 'missing_desc': products['missing_desc'], 'perf_score': perf, 'seo_score': seo}
     recommendations = get_gemini_recommendations(store_data)
+
     funnel = [100, 68, 42, 28, 18]
+
     return jsonify({
         'score': score, 'score_desc': score_desc, 'revenue_loss': revenue_loss,
         'products': products['total'], 'missing_images': products['missing_images'],
